@@ -1,0 +1,21 @@
+# -*- coding: utf-8 -*-
+
+# Copyright © 2015 Samir Benmendil <me@rmz.io>
+# This work is free. You can redistribute it and/or modify it under the
+# terms of the Do What The Fuck You Want To Public License, Version 2,
+# as published by Sam Hocevar. See http://www.wtfpl.net/ for more details.
+
+
+from picard.plugin3.api import PluginApi
+
+
+
+def soundtrack(tagger, metadata, release):
+    if "soundtrack" in metadata["releasetype"]:
+        metadata["albumartist"] = "Soundtrack"
+        metadata["albumartistsort"] = "Soundtrack"
+
+
+def enable(api: PluginApi):
+    """Called when plugin is enabled."""
+    api.register_album_metadata_processor(soundtrack)
