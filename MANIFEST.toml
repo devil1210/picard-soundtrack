@@ -1,9 +1,9 @@
-uuid = "6c7d8e9f-0a1b-2c3d-4e5f-6a7b8c9d0e1f"
+uuid = "8169e865-790e-49ff-8eff-a552697a6ce4"
 name = "Soundtrack"
 version = "1.0.0"
-authors = ["MusicBrainz Contributors"]
+authors = ['MusicBrainz Contributors']
 description = "Adds soundtrack tag for OST releases."
-categories = ["metadata"]
+categories = ['metadata']
 homepage = "https://github.com/musicbrainz/picard-plugins/tree/2.0/plugins/soundtrack"
 report_bugs_to = "https://github.com/musicbrainz/picard-plugins/tree/2.0/plugins/soundtrack"
 api = ["3.0"]
