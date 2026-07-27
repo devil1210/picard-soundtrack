@@ -1,39 +1,57 @@
-
-_api = None
-
-def _get_option(key, default=None):
-    global _api
-    if _api and hasattr(_api, "plugin_config"):
-        try:
-            val = __get_option(key)
-            if val is not None:
-                return val
-        except Exception:
-            pass
-    if hasattr(config, "setting"):
-        try:
-            val = config.setting[key]
-            if val is not None:
-                return val
-        except Exception:
-            pass
-    return default
-
-_api = None
 # -*- coding: utf-8 -*-
-
-# Copyright © 2015 Samir Benmendil <me@rmz.io>
-# This work is free. You can redistribute it and/or modify it under the
-# terms of the Do What The Fuck You Want To Public License, Version 2,
-# as published by Sam Hocevar. See http://www.wtfpl.net/ for more details.
-
 
 from picard.plugin3.api import PluginApi
 
+_api = None
 
+def process_soundtrack(*args, **kwargs):
+    obj = None
+    metadata = None
+    release = None
+    for a in args:
+        if hasattr(a, 'getall') or (isinstance(a, dict) and ('title' in a or 'releasetype' in a)):
+            metadata = a
+        elif isinstance(a, dict) and 'release-group' in a:
+            release = a
+        elif hasattr(a, 'album') or hasattr(a, 'tracks'):
+            obj = a
 
-def soundtrack(tagger, metadata, release):
-    if "soundtrack" in metadata["releasetype"]:
+    if not metadata:
+        return
+
+    rel_types = []
+    if hasattr(metadata, 'getall'):
+        rt = metadata.getall('releasetype')
+    else:
+        rt = metadata.get('releasetype', [])
+
+    if isinstance(rt, (list, tuple)):
+        rel_types.extend([str(x).lower() for x in rt])
+    elif rt:
+        rel_types.extend([str(x).lower() for x in str(rt).split('/')])
+
+    if obj and hasattr(obj, 'album') and obj.album and hasattr(obj.album, 'metadata'):
+        a_rt = obj.album.metadata.getall('releasetype') if hasattr(obj.album.metadata, 'getall') else obj.album.metadata.get('releasetype', [])
+        if isinstance(a_rt, (list, tuple)):
+            rel_types.extend([str(x).lower() for x in a_rt])
+        elif a_rt:
+            rel_types.extend([str(x).lower() for x in str(a_rt).split('/')])
+
+    if release and isinstance(release, dict):
+        rg = release.get('release-group', {})
+        sec_types = rg.get('secondary-types', [])
+        prim_type = rg.get('primary-type', '')
+        rel_types.extend([str(x).lower() for x in sec_types])
+        if prim_type:
+            rel_types.append(str(prim_type).lower())
+
+    path_is_soundtrack = False
+    if obj and hasattr(obj, 'filename') and obj.filename and 'soundtrack' in str(obj.filename).lower():
+        path_is_soundtrack = True
+
+    is_soundtrack = any('soundtrack' in t or 'ost' in t or 'score' in t for t in rel_types) or path_is_soundtrack
+
+    if is_soundtrack:
         metadata["albumartist"] = "Soundtrack"
         metadata["albumartistsort"] = "Soundtrack"
 
@@ -41,5 +59,5 @@ def soundtrack(tagger, metadata, release):
 def enable(api: PluginApi):
     global _api
     _api = api
-    """Called when plugin is enabled."""
-    api.register_album_metadata_processor(soundtrack)
+    api.register_album_metadata_processor(process_soundtrack)
+    api.register_track_metadata_processor(process_soundtrack)
