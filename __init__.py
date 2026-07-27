@@ -1,3 +1,4 @@
+_api = None
 # -*- coding: utf-8 -*-
 
 # Copyright © 2015 Samir Benmendil <me@rmz.io>
@@ -17,5 +18,7 @@ def soundtrack(tagger, metadata, release):
 
 
 def enable(api: PluginApi):
+    global _api
+    _api = api
     """Called when plugin is enabled."""
     api.register_album_metadata_processor(soundtrack)
