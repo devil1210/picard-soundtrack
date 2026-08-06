@@ -1,55 +1,82 @@
 # -*- coding: utf-8 -*-
 
+import re
 from picard.plugin3.api import PluginApi
 
 _api = None
+
+SOUNDTRACK_KEYWORDS = (
+    'soundtrack', 'ost', 'original motion picture', 'original score',
+    'motion picture soundtrack', 'music from', 'music inspired by',
+    'game soundtrack', 'original soundtrack', 'tvアニメ', 'サントラ',
+    'オリジナル・サウンドトラック', 'オリジナルサウンドトラック', '劇中歌', 'bgm'
+)
 
 def process_soundtrack(*args, **kwargs):
     obj = None
     metadata = None
     release = None
     for a in args:
-        if hasattr(a, 'getall') or (isinstance(a, dict) and ('title' in a or 'releasetype' in a)):
+        if hasattr(a, 'getall') or (isinstance(a, dict) and ('title' in a or 'releasetype' in a or 'album' in a)):
             metadata = a
         elif isinstance(a, dict) and 'release-group' in a:
             release = a
-        elif hasattr(a, 'album') or hasattr(a, 'tracks'):
+        elif hasattr(a, 'album') or hasattr(a, 'tracks') or hasattr(a, 'filename'):
             obj = a
 
     if not metadata:
         return
 
+    is_soundtrack = False
+
+    # 1. Check release types in metadata
     rel_types = []
-    if hasattr(metadata, 'getall'):
-        rt = metadata.getall('releasetype')
-    else:
-        rt = metadata.get('releasetype', [])
+    for tag in ('releasetype', 'musicbrainz_releasetype'):
+        if hasattr(metadata, 'getall'):
+            rt = metadata.getall(tag)
+        else:
+            rt = metadata.get(tag, [])
+        if isinstance(rt, (list, tuple)):
+            rel_types.extend([str(x).lower() for x in rt])
+        elif rt:
+            rel_types.extend([str(x).lower() for x in str(rt).split('/')])
 
-    if isinstance(rt, (list, tuple)):
-        rel_types.extend([str(x).lower() for x in rt])
-    elif rt:
-        rel_types.extend([str(x).lower() for x in str(rt).split('/')])
+    if any(k in t for t in rel_types for k in ('soundtrack', 'ost', 'score')):
+        is_soundtrack = True
 
-    if obj and hasattr(obj, 'album') and obj.album and hasattr(obj.album, 'metadata'):
-        a_rt = obj.album.metadata.getall('releasetype') if hasattr(obj.album.metadata, 'getall') else obj.album.metadata.get('releasetype', [])
-        if isinstance(a_rt, (list, tuple)):
-            rel_types.extend([str(x).lower() for x in a_rt])
-        elif a_rt:
-            rel_types.extend([str(x).lower() for x in str(a_rt).split('/')])
-
-    if release and isinstance(release, dict):
+    # 2. Check release group from MB release dict
+    if not is_soundtrack and release and isinstance(release, dict):
         rg = release.get('release-group', {})
         sec_types = rg.get('secondary-types', [])
         prim_type = rg.get('primary-type', '')
-        rel_types.extend([str(x).lower() for x in sec_types])
-        if prim_type:
-            rel_types.append(str(prim_type).lower())
+        all_types = [str(x).lower() for x in sec_types] + ([str(prim_type).lower()] if prim_type else [])
+        if any(k in t for t in all_types for k in ('soundtrack', 'ost', 'score')):
+            is_soundtrack = True
 
-    path_is_soundtrack = False
-    if obj and hasattr(obj, 'filename') and obj.filename and 'soundtrack' in str(obj.filename).lower():
-        path_is_soundtrack = True
+    # 3. Check album title, originalalbum, or track title
+    if not is_soundtrack:
+        for key in ('album', 'originalalbum', 'title'):
+            val = metadata.get(key, '')
+            if isinstance(val, list) and val:
+                val = val[0]
+            val_lower = str(val).lower()
+            if any(kw in val_lower for kw in SOUNDTRACK_KEYWORDS):
+                is_soundtrack = True
+                break
 
-    is_soundtrack = any('soundtrack' in t or 'ost' in t or 'score' in t for t in rel_types) or path_is_soundtrack
+    # 4. Check genre
+    if not is_soundtrack:
+        genres = metadata.getall('genre') if hasattr(metadata, 'getall') else metadata.get('genre', [])
+        if isinstance(genres, str):
+            genres = [genres]
+        if any(k in str(g).lower() for g in genres for k in ('soundtrack', 'ost', 'score')):
+            is_soundtrack = True
+
+    # 5. Check filename / file path
+    if not is_soundtrack and obj:
+        fn = getattr(obj, 'filename', '') or (getattr(obj, 'file', None) and getattr(obj.file, 'filename', ''))
+        if fn and any(k in str(fn).lower() for k in ('soundtrack', 'ost', 'score')):
+            is_soundtrack = True
 
     if is_soundtrack:
         metadata["albumartist"] = "Soundtrack"
