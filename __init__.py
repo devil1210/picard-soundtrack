@@ -16,10 +16,11 @@ def process_soundtrack(*args, **kwargs):
     obj = None
     metadata = None
     release = None
+
     for a in args:
-        if hasattr(a, 'getall') or (isinstance(a, dict) and ('title' in a or 'releasetype' in a or 'album' in a)):
+        if hasattr(a, 'getall'):
             metadata = a
-        elif isinstance(a, dict) and 'release-group' in a:
+        elif isinstance(a, dict):
             release = a
         elif hasattr(a, 'album') or hasattr(a, 'tracks') or hasattr(a, 'filename'):
             obj = a
@@ -32,10 +33,7 @@ def process_soundtrack(*args, **kwargs):
     # 1. Check release types in metadata
     rel_types = []
     for tag in ('releasetype', 'musicbrainz_releasetype'):
-        if hasattr(metadata, 'getall'):
-            rt = metadata.getall(tag)
-        else:
-            rt = metadata.get(tag, [])
+        rt = metadata.getall(tag) if hasattr(metadata, 'getall') else metadata.get(tag, [])
         if isinstance(rt, (list, tuple)):
             rel_types.extend([str(x).lower() for x in rt])
         elif rt:
